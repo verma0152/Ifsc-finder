@@ -1,0 +1,779 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IFSC Finder - Indian Bank Branch Locator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css">
+    <style>
+        .hidden {
+            display: none;
+        }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .dark-mode {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        
+        .dark-mode .card {
+            background-color: #2d3748;
+            color: #e2e8f0;
+        }
+        
+        .dark-mode .btn-light {
+            background-color: #4a5568;
+            color: #e2e8f0;
+        }
+        
+        .dark-mode select, .dark-mode input {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border-color: #4a5568;
+        }
+        
+        .dark-mode .table {
+            color: #e2e8f0;
+        }
+        
+        .dark-mode .table th {
+            background-color: #4a5568;
+        }
+        
+        .dark-mode .table td {
+            border-color: #4a5568;
+        }
+        
+        .dark-mode .debug-panel {
+            background-color: #2d3748;
+            border-color: #4a5568;
+        }
+        
+        .card {
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        select, input[type="text"], button {
+            transition: all 0.2s ease;
+        }
+        
+        select:hover, input[type="text"]:hover {
+            border-color: #4299e1;
+        }
+        
+        select:focus, input[type="text"]:focus {
+            border-color: #3182ce;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .results-card {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease;
+        }
+        
+        .results-card.show {
+            max-height: 500px;
+        }
+        
+        .debug-panel {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #f8fafc;
+            margin-top: 1.5rem;
+            overflow: auto;
+        }
+        
+        .debug-panel pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+         {
+            body {
+                width: 100%;
+                height: auto;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+            
+            .container {
+                width: 100%;
+                max-width: 100%;
+            }
+            
+            .debug-panel {
+                overflow: visible;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">IFSC Finder</h1>
+            <button id="toggleTheme" class="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="bx bx-moon mr-2"></i> <span id="themeText">Dark Mode</span>
+            </button>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6 card">
+            <h2 class="text-xl font-semibold mb-4">Upload IFSC CSV File</h2>
+            <div class="mb-4">
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+                <label for="csvFileInput" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg cursor-pointer inline-block">
+                    <i class="bx bx-upload mr-2"></i> Choose CSV File
+                </label>
+                <span id="fileNameDisplay" class="ml-3 text-gray-600">No file chosen</span>
+            </div>
+            <div id="loadingSpinner" class="loader hidden"></div>
+            <div id="csvLoadStatus" class="text-sm text-gray-600 mt-2"></div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-6 card">
+                <h2 class="text-xl font-semibold mb-4">Search by Selection</h2>
+                <div class="mb-4">
+                    <label for="bankSelect" class="block text-gray-700 mb-2">Select Bank</label>
+                    <select id="bankSelect" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Select a bank</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="stateSelect" class="block text-gray-700 mb-2">Select State</label>
+                    <select id="stateSelect" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Select a state</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="districtSelect" class="block text-gray-700 mb-2">Select District</label>
+                    <select id="districtSelect" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Select a district</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="branchSelect" class="block text-gray-700 mb-2">Select Branch</label>
+                    <select id="branchSelect" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                        <option value="">Select a branch</option>
+                    </select>
+                </div>
+                <button id="findBySelection" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg w-full disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    <i class="bx bx-search mr-2"></i> Find IFSC
+                </button>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card">
+                <h2 class="text-xl font-semibold mb-4">Search by IFSC Code</h2>
+                <div class="mb-4">
+                    <label for="ifscInput" class="block text-gray-700 mb-2">Enter IFSC Code</label>
+                    <input type="text" id="ifscInput" placeholder="e.g. SBIN0000001" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                </div>
+                <button id="findByIFSC" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg w-full disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    <i class="bx bx-search mr-2"></i> Find Bank Details
+                </button>
+            </div>
+        </div>
+        
+        <div id="resultsCard" class="bg-white rounded-lg shadow-md p-6 card results-card mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Bank Details</h2>
+            <div id="results">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 table">
+                        <tbody id="resultsTable" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div id="debugPanelContainer" class="mb-6 hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 card">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Debug Panel</h2>
+                    <button id="toggleDebug" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-3 rounded-lg">
+                        <i class="bx bx-chevron-down"></i>
+                    </button>
+                </div>
+                <div id="debugPanel" class="debug-panel">
+                    <h3 class="font-semibold mb-2">Detected Column Mappings:</h3>
+                    <pre id="columnMappings" class="text-xs"></pre>
+                    <h3 class="font-semibold mb-2 mt-4">CSV Structure (First 3 rows):</h3>
+                    <pre id="csvStructure" class="text-xs"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 card mb-6">
+            <h2 class="text-xl font-semibold mb-4">Instructions</h2>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold text-lg">How to Use This App</h3>
+                    <ol class="list-decimal pl-5 mt-2 space-y-2">
+                        <li>Upload a CSV file with Indian bank IFSC codes using the button above.</li>
+                        <li>The app will automatically detect column names, even with different naming conventions.</li>
+                        <li>Use either the dropdown-based search or direct IFSC code search to find bank details.</li>
+                        <li>View the Debug Panel to see how the app has mapped your CSV columns.</li>
+                    </ol>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg">Supported CSV Format</h3>
+                    <p class="mt-2">Your CSV file should contain the following information (column names can vary):</p>
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li><strong>Bank Name</strong>: Name of the bank (e.g., "BANK", "Bank", "bank_name", "Bank Name")</li>
+                        <li><strong>State</strong>: State where the branch is located (e.g., "STATE", "State", "state_name")</li>
+                        <li><strong>District</strong>: District of the branch (e.g., "DISTRICT", "District", "district_name")</li>
+                        <li><strong>Branch</strong>: Branch name (e.g., "BRANCH", "Branch", "branch_name")</li>
+                        <li><strong>IFSC Code</strong>: The IFSC code (e.g., "IFSC", "Ifsc", "ifsc_code")</li>
+                        <li><strong>Address</strong>: Branch address (e.g., "ADDRESS", "Address", "full_address")</li>
+                        <li><strong>Contact</strong>: Contact number (e.g., "CONTACT", "Contact", "phone")</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg">Features</h3>
+                    <ul class="list-disc pl-5 mt-2 space-y-1">
+                        <li>Works entirely in your browser - no data is sent to any server</li>
+                        <li>Optimized for printing to PDF</li>
+                        <li>Responsive design works on mobile and desktop</li>
+                        <li>Dark/Light mode for comfortable viewing</li>
+                        <li>Intelligently detects column names regardless of case or formatting</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="text-center text-gray-600 text-sm mt-8 mb-4">
+            <p>IFSC Finder - A tool for searching Indian bank branch details</p>
+        </footer>
+    </div>
+    
+    <!-- Include PapaParse for CSV parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.1/papaparse.min.js"></script>
+    
+    <script>
+        // Global variables
+        let csvData = [];
+        let columnMap = {};
+        let banks = [];
+        let states = [];
+        let districts = [];
+        let branches = [];
+        let isDarkMode = false;
+        let isDebugPanelExpanded = true;
+        
+        // DOM elements
+        const fileInput = document.getElementById('csvFileInput');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const csvLoadStatus = document.getElementById('csvLoadStatus');
+        const bankSelect = document.getElementById('bankSelect');
+        const stateSelect = document.getElementById('stateSelect');
+        const districtSelect = document.getElementById('districtSelect');
+        const branchSelect = document.getElementById('branchSelect');
+        const findBySelectionBtn = document.getElementById('findBySelection');
+        const ifscInput = document.getElementById('ifscInput');
+        const findByIFSCBtn = document.getElementById('findByIFSC');
+        const resultsCard = document.getElementById('resultsCard');
+        const resultsTable = document.getElementById('resultsTable');
+        const debugPanelContainer = document.getElementById('debugPanelContainer');
+        const debugPanel = document.getElementById('debugPanel');
+        const columnMappings = document.getElementById('columnMappings');
+        const csvStructure = document.getElementById('csvStructure');
+        const toggleThemeBtn = document.getElementById('toggleTheme');
+        const themeText = document.getElementById('themeText');
+        const toggleDebugBtn = document.getElementById('toggleDebug');
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', initApp);
+        fileInput.addEventListener('change', handleFileSelect);
+        bankSelect.addEventListener('change', handleBankChange);
+        stateSelect.addEventListener('change', handleStateChange);
+        districtSelect.addEventListener('change', handleDistrictChange);
+        findBySelectionBtn.addEventListener('click', findBySelection);
+        findByIFSCBtn.addEventListener('click', findByIFSC);
+        toggleThemeBtn.addEventListener('click', toggleTheme);
+        toggleDebugBtn.addEventListener('click', toggleDebugPanel);
+        
+        // Initialize the app
+        function initApp() {
+            // Check for saved theme preference
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                toggleTheme();
+            }
+        }
+        
+        // Toggle between light and dark mode
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode', isDarkMode);
+            themeText.textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
+            toggleThemeBtn.innerHTML = isDarkMode ? 
+                '<i class="bx bx-sun mr-2"></i> <span id="themeText">Light Mode</span>' : 
+                '<i class="bx bx-moon mr-2"></i> <span id="themeText">Dark Mode</span>';
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+        }
+        
+        // Toggle debug panel visibility
+        function toggleDebugPanel() {
+            isDebugPanelExpanded = !isDebugPanelExpanded;
+            debugPanel.classList.toggle('hidden', !isDebugPanelExpanded);
+            toggleDebugBtn.innerHTML = isDebugPanelExpanded ? 
+                '<i class="bx bx-chevron-up"></i>' : 
+                '<i class="bx bx-chevron-down"></i>';
+        }
+        
+        // Handle file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            fileNameDisplay.textContent = file.name;
+            loadingSpinner.classList.remove('hidden');
+            csvLoadStatus.textContent = 'Loading CSV file...';
+            
+            // Reset previous data
+            resetApp();
+            
+            // Parse the CSV file
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: handleParseComplete,
+                error: handleParseError
+            });
+        }
+        
+        // Handle CSV parse completion
+        function handleParseComplete(results) {
+            if (results.data.length === 0) {
+                handleParseError({ message: 'The CSV file appears to be empty.' });
+                return;
+            }
+            
+            try {
+                csvData = results.data;
+                
+                // Map column names
+                mapColumnNames(results.meta.fields);
+                
+                // Check if we have the required columns
+                if (!validateRequiredColumns()) {
+                    csvLoadStatus.textContent = 'Error: CSV file is missing required columns. See debug panel for details.';
+                    csvLoadStatus.className = 'text-sm text-red-600 mt-2';
+                    loadingSpinner.classList.add('hidden');
+                    debugPanelContainer.classList.remove('hidden');
+                    return;
+                }
+                
+                // Extract unique values for dropdowns
+                populateDropdowns();
+                
+                // Update UI
+                enableUI();
+                csvLoadStatus.textContent = `Successfully loaded ${csvData.length} records`;
+                csvLoadStatus.className = 'text-sm text-green-600 mt-2';
+                
+                // Show debug panel with mappings
+                updateDebugPanel(results);
+                debugPanelContainer.classList.remove('hidden');
+                
+            } catch (error) {
+                handleParseError(error);
+            } finally {
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+        
+        // Handle CSV parse error
+        function handleParseError(error) {
+            console.error('Error parsing CSV:', error);
+            csvLoadStatus.textContent = `Error: ${error.message || 'Failed to parse CSV file'}`;
+            csvLoadStatus.className = 'text-sm text-red-600 mt-2';
+            loadingSpinner.classList.add('hidden');
+        }
+        
+        // Map column names to standardized keys
+        function mapColumnNames(fields) {
+            columnMap = {};
+            
+            // Possible column name patterns
+            const patterns = {
+                bank: ['bank', 'bankname', 'bank_name', 'bank name', 'bankid'],
+                state: ['state', 'statename', 'state_name', 'state name', 'stateid'],
+                district: ['district', 'districtname', 'district_name', 'district name', 'districtid'],
+                branch: ['branch', 'branchname', 'branch_name', 'branch name', 'branchid'],
+                ifsc: ['ifsc', 'ifsccode', 'ifsc_code', 'ifsc code'],
+                address: ['address', 'fulladdress', 'full_address', 'full address', 'branchaddress', 'branch_address'],
+                contact: ['contact', 'phone', 'phonenumber', 'phone_number', 'phone number', 'mobile', 'telephone', 'contactnumber']
+            };
+            
+            // For each field in CSV, find matching standard key
+            fields.forEach(field => {
+                const lowerField = field.toLowerCase().replace(/\s+/g, '');
+                
+                for (const [key, possibleNames] of Object.entries(patterns)) {
+                    if (possibleNames.some(name => lowerField === name.replace(/\s+/g, '').toLowerCase())) {
+                        columnMap[key] = field;
+                        break;
+                    }
+                }
+            });
+            
+            // If we couldn't map all required columns, use best guess for missing ones
+            const requiredColumns = ['bank', 'state', 'district', 'branch', 'ifsc'];
+            for (const key of requiredColumns) {
+                if (!columnMap[key]) {
+                    // Try to find any column that contains the key name
+                    const possibleMatch = fields.find(field => 
+                        field.toLowerCase().includes(key.toLowerCase())
+                    );
+                    
+                    if (possibleMatch) {
+                        columnMap[key] = possibleMatch;
+                    }
+                }
+            }
+        }
+        
+        // Validate that we have mapped all required columns
+        function validateRequiredColumns() {
+            const requiredColumns = ['bank', 'state', 'district', 'branch', 'ifsc'];
+            const missingColumns = requiredColumns.filter(col => !columnMap[col]);
+            
+            if (missingColumns.length > 0) {
+                console.error('Missing required columns:', missingColumns);
+                columnMappings.textContent = JSON.stringify(columnMap, null, 2) + 
+                    '\n\nMISSING REQUIRED COLUMNS: ' + missingColumns.join(', ');
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Update debug panel with column mappings and sample data
+        function updateDebugPanel(results) {
+            // Show column mappings
+            columnMappings.textContent = JSON.stringify(columnMap, null, 2);
+            
+            // Show sample of CSV structure (first 3 rows)
+            const sampleData = results.data.slice(0, 3);
+            csvStructure.textContent = JSON.stringify(sampleData, null, 2);
+        }
+        
+        // Populate dropdowns with unique values
+        function populateDropdowns() {
+            // Extract unique banks
+            banks = [...new Set(csvData.map(row => row[columnMap.bank]))].sort();
+            populateDropdown(bankSelect, banks);
+            
+            // Enable only the bank dropdown initially
+            bankSelect.disabled = false;
+        }
+        
+        // Populate a dropdown with options
+        function populateDropdown(selectElement, options, defaultText = "Select...") {
+            // Clear current options
+            selectElement.innerHTML = '';
+            
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = defaultText;
+            selectElement.appendChild(defaultOption);
+            
+            // Add options
+            options.forEach(option => {
+                if (option && option.trim()) {  // Check for empty values
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    selectElement.appendChild(optionElement);
+                }
+            });
+        }
+        
+        // Handle bank selection change
+        function handleBankChange() {
+            const selectedBank = bankSelect.value;
+            
+            // Reset dependent dropdowns
+            stateSelect.innerHTML = '<option value="">Select a state</option>';
+            districtSelect.innerHTML = '<option value="">Select a district</option>';
+            branchSelect.innerHTML = '<option value="">Select a branch</option>';
+            
+            if (selectedBank) {
+                // Filter states by selected bank
+                states = [...new Set(
+                    csvData
+                        .filter(row => row[columnMap.bank] === selectedBank)
+                        .map(row => row[columnMap.state])
+                )].sort();
+                
+                populateDropdown(stateSelect, states);
+                stateSelect.disabled = false;
+                districtSelect.disabled = true;
+                branchSelect.disabled = true;
+            } else {
+                stateSelect.disabled = true;
+                districtSelect.disabled = true;
+                branchSelect.disabled = true;
+            }
+            
+            // Update search button state
+            findBySelectionBtn.disabled = true;
+        }
+        
+        // Handle state selection change
+        function handleStateChange() {
+            const selectedBank = bankSelect.value;
+            const selectedState = stateSelect.value;
+            
+            // Reset dependent dropdowns
+            districtSelect.innerHTML = '<option value="">Select a district</option>';
+            branchSelect.innerHTML = '<option value="">Select a branch</option>';
+            
+            if (selectedState) {
+                // Filter districts by selected bank and state
+                districts = [...new Set(
+                    csvData
+                        .filter(row => 
+                            row[columnMap.bank] === selectedBank && 
+                            row[columnMap.state] === selectedState
+                        )
+                        .map(row => row[columnMap.district])
+                )].sort();
+                
+                populateDropdown(districtSelect, districts);
+                districtSelect.disabled = false;
+                branchSelect.disabled = true;
+            } else {
+                districtSelect.disabled = true;
+                branchSelect.disabled = true;
+            }
+            
+            // Update search button state
+            findBySelectionBtn.disabled = true;
+        }
+        
+        // Handle district selection change
+        function handleDistrictChange() {
+            const selectedBank = bankSelect.value;
+            const selectedState = stateSelect.value;
+            const selectedDistrict = districtSelect.value;
+            
+            // Reset branch dropdown
+            branchSelect.innerHTML = '<option value="">Select a branch</option>';
+            
+            if (selectedDistrict) {
+                // Filter branches by selected bank, state, and district
+                branches = [...new Set(
+                    csvData
+                        .filter(row => 
+                            row[columnMap.bank] === selectedBank && 
+                            row[columnMap.state] === selectedState &&
+                            row[columnMap.district] === selectedDistrict
+                        )
+                        .map(row => row[columnMap.branch])
+                )].sort();
+                
+                populateDropdown(branchSelect, branches);
+                branchSelect.disabled = false;
+            } else {
+                branchSelect.disabled = true;
+            }
+            
+            // Update search button state
+            findBySelectionBtn.disabled = true;
+        }
+        
+        // Handle branch selection change
+        branchSelect.addEventListener('change', function() {
+            // Enable or disable search button based on selection
+            findBySelectionBtn.disabled = !branchSelect.value;
+        });
+        
+        // Search by dropdown selection
+        function findBySelection() {
+            const selectedBank = bankSelect.value;
+            const selectedState = stateSelect.value;
+            const selectedDistrict = districtSelect.value;
+            const selectedBranch = branchSelect.value;
+            
+            // Find matching record
+            const record = csvData.find(row => 
+                row[columnMap.bank] === selectedBank && 
+                row[columnMap.state] === selectedState &&
+                row[columnMap.district] === selectedDistrict &&
+                row[columnMap.branch] === selectedBranch
+            );
+            
+            if (record) {
+                displayResults(record);
+            } else {
+                showError('No matching record found');
+            }
+        }
+        
+        // Search by IFSC code
+        function findByIFSC() {
+            const ifscCode = ifscInput.value.trim().toUpperCase();
+            
+            if (!ifscCode) {
+                showError('Please enter an IFSC code');
+                return;
+            }
+            
+            // Find matching record
+            const record = csvData.find(row => 
+                row[columnMap.ifsc]?.toUpperCase() === ifscCode
+            );
+            
+            if (record) {
+                displayResults(record);
+            } else {
+                showError(`No bank found with IFSC code: ${ifscCode}`);
+            }
+        }
+        
+        // Display bank details
+        function displayResults(record) {
+            // Clear previous results
+            resultsTable.innerHTML = '';
+            
+            // Define fields to display (with fallbacks for optional fields)
+            const fieldsToDisplay = [
+                { key: 'ifsc', label: 'IFSC Code' },
+                { key: 'bank', label: 'Bank Name' },
+                { key: 'branch', label: 'Branch' },
+                { key: 'address', label: 'Address' },
+                { key: 'district', label: 'District' },
+                { key: 'state', label: 'State' },
+                { key: 'contact', label: 'Contact' }
+            ];
+            
+            // Create rows for each field
+            fieldsToDisplay.forEach(field => {
+                if (columnMap[field.key]) {
+                    const row = document.createElement('tr');
+                    
+                    const labelCell = document.createElement('td');
+                    labelCell.className = 'px-6 py-4 whitespace-nowrap font-medium text-gray-900 w-1/3';
+                    labelCell.textContent = field.label;
+                    
+                    const valueCell = document.createElement('td');
+                    valueCell.className = 'px-6 py-4 whitespace-pre-wrap break-words text-gray-700';
+                    valueCell.textContent = record[columnMap[field.key]] || 'N/A';
+                    
+                    row.appendChild(labelCell);
+                    row.appendChild(valueCell);
+                    resultsTable.appendChild(row);
+                }
+            });
+            
+            // Show results card
+            resultsCard.classList.remove('hidden');
+            resultsCard.classList.add('show');
+            
+            // Scroll to results
+            resultsCard.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Show error message
+        function showError(message) {
+            // Clear previous results
+            resultsTable.innerHTML = '';
+            
+            // Create error row
+            const row = document.createElement('tr');
+            
+            const errorCell = document.createElement('td');
+            errorCell.className = 'px-6 py-4 text-center text-red-600';
+            errorCell.textContent = message;
+            errorCell.colSpan = 2;
+            
+            row.appendChild(errorCell);
+            resultsTable.appendChild(row);
+            
+            // Show results card
+            resultsCard.classList.remove('hidden');
+            resultsCard.classList.add('show');
+        }
+        
+        // Enable UI elements after CSV is loaded
+        function enableUI() {
+            bankSelect.disabled = false;
+            ifscInput.disabled = false;
+            findByIFSCBtn.disabled = false;
+        }
+        
+        // Reset app state
+        function resetApp() {
+            csvData = [];
+            columnMap = {};
+            banks = [];
+            states = [];
+            districts = [];
+            branches = [];
+            
+            // Reset dropdowns
+            bankSelect.innerHTML = '<option value="">Select a bank</option>';
+            stateSelect.innerHTML = '<option value="">Select a state</option>';
+            districtSelect.innerHTML = '<option value="">Select a district</option>';
+            branchSelect.innerHTML = '<option value="">Select a branch</option>';
+            
+            // Disable UI elements
+            bankSelect.disabled = true;
+            stateSelect.disabled = true;
+            districtSelect.disabled = true;
+            branchSelect.disabled = true;
+            ifscInput.disabled = true;
+            findBySelectionBtn.disabled = true;
+            findByIFSCBtn.disabled = true;
+            
+            // Hide results
+            resultsCard.classList.add('hidden');
+            resultsCard.classList.remove('show');
+            resultsTable.innerHTML = '';
+            
+            // Hide debug panel
+            debugPanelContainer.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
